@@ -28,6 +28,13 @@ When you've entered the setting values click "Submit" to send the values back in
 When this page is displayed your device has been configured. It will reset but it might not connect correctly. Unplug it and plug it back in if you have this problem. 
 
 If you select the wrong display type you might find that your display gets stuck. In that case plug the display into your computer and use Thonny to modify the settings.json file, or delete the file and you can then re-configure your device.
+
+# Display versions
+
+![devices](/images/devices.jpg)
+
+The software will work with these two displays.
+
 # Case Design
 You can find the designs for the case in the case folder on this site.
 
