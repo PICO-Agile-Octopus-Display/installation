@@ -307,7 +307,7 @@ class Agile:
             end_secs = end_secs-3600
         s = time.localtime(start_secs)           
         e = time.localtime(end_secs)
-        period = "period_from=%d-%02d-%02dT%02d:%02dZ&period_to=%d-%02d-%02sT%02d:%02dZ"% \
+        period = "period_from=%d-%02d-%02dT%02d:%02dZ&period_to=%d-%02d-%02dT%02d:%02dZ"% \
                  (s[0],s[1],s[2],s[3],s[4], \
                   e[0],e[1],e[2],e[3],e[4])
         url = self.ctrl.config.settings['AgileURL']['value']
@@ -606,5 +606,6 @@ manager.do_start()
 while True:
     manager.do_update()
     time.sleep(1)
+
 
 
