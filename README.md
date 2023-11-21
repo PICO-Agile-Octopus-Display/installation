@@ -7,7 +7,7 @@ You will need a PICO-W device and a display. The code is written for the [Pimoro
 ## Firmware Installation
 Your PICO-W must be running the Pimoroni MicroPython image. You can find the version used for this project in the firmware project. Hold down the BOOTSEL button down on your PICO-W, plug it into your computer and then drag the image file onto the hard drive that appears.
 ## Sofware Installation
-Once you have installed the firmware you can use the [Thonny program](https://thonny.org/)  to copy the main.py program onto the display. 
+Once you have installed the firmware you can use the [Thonny program](https://thonny.org/)  to copy the **main.py** and **strptime.py** program files onto the display. Put them both in the root folder. 
 ## Software configuration
 
 ![configuration connect](/images/config1.png)
