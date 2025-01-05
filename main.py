@@ -8,10 +8,12 @@ from strptime import strptime
 import json
 import select
 import sys
+import gc
 # Code for Mono LCD
 import gfx_pack
 from picographics import PicoGraphics, DISPLAY_INKY_PACK
 
+constant_reload = False
 
 class DisplayItem:
     LEFT = 0
@@ -200,6 +202,8 @@ class InkDisplay(Display):
             if bars[i] < low:
                 low = bars[i]
         rng = high-low
+        if rng==0:
+            rng=10
         scale_y = available_height/rng
         for i in range(bars_length):
             if bars[i] == None:
@@ -272,6 +276,8 @@ class GFXDisplay(Display):
             if bars[i] < low:
                 low = bars[i]
         rng = high-low
+        if rng==0:
+            rng=10
         scale_y = available_height/rng
         scale_x = width/bars_length
         for i in range(bars_length):
@@ -300,8 +306,16 @@ class Agile:
         self.rates = None
         self.half_hour_prices = None
         self.update_hour = None
+        self.empty_prices = [0,0,0]
 
     def do_get_daily_rates(self, time_mgr):
+        # clear the price display when we do a real update
+        print("Daily get Memory:", gc.mem_free())
+        if self.half_hour_prices != None:
+            self.ctrl.display.do_bars(self.empty_prices,3, self.offset)
+            self.ctrl.display.do_min(" ")
+            self.ctrl.display.do_max(" ")
+            
         self.ctrl.display.do_status("Getting daily rates")
         self.ctrl.display.draw()
         t = time_mgr.time
@@ -319,8 +333,9 @@ class Agile:
                  (s[0], s[1], s[2], s[3], s[4],
                   e[0], e[1], e[2], e[3], e[4])
         url = self.ctrl.config.settings['AgileURL']['value']
-        print("Request:", url+period)
-        res = urequests.get(url+"?"+period)
+        full_addr = url+"?"+period
+        print("Request:", full_addr)
+        res = urequests.get(full_addr)
         results = res.json()["results"]
         self.half_hour_prices = [None] * 48
 
@@ -347,18 +362,26 @@ class Agile:
                 self.max_price = price
             if price < self.min_price:
                 self.min_price = price
-
-        self.mean_price = total_cost / reading_count
-        self.ctrl.display.do_status("Updated %2d:%02d" % (rh,rm))
-        self.ctrl.display.draw()
+                
+        if reading_count>0:
+            self.mean_price = total_cost / reading_count
+            self.ctrl.display.do_status("Updated %2d:%02d" % (rh,rm))
+            self.ctrl.display.draw()
+            return True
+        else:
+            self.ctrl.display.do_status("No readings received")
+            self.ctrl.display.draw()
+            return False
+            
 
     def do_get_rate(self, time_mgr):
         t = time_mgr.time
         hour = t[3]
         minute = t[4]
 
-        if self.half_hour_prices == None or self.update_hour != hour:
-            self.do_get_daily_rates(time_mgr)
+        if self.half_hour_prices == None or self.update_hour != hour or constant_reload:
+            if not self.do_get_daily_rates(time_mgr):
+                return None
             self.update_hour = hour
             
         self.offset = hour*2
@@ -366,10 +389,10 @@ class Agile:
             self.offset = self.offset+1
 
         if self.half_hour_prices[self.offset] == None:
-            self.do_get_daily_rates(time_mgr)
+            if not self.do_get_daily_rates(time_mgr):
+                return None
 
-        return self.half_hour_prices[self.offset]
-
+        return self.half_hour_prices[self.offset] 
 
 class Connection:
 
@@ -476,7 +499,7 @@ class Config:
             "name": "Agile Octopus URL",
             "desc": "URL for the Agile Octopus price data",
             "type": "text",
-            "value": "https://api.octopus.energy/v1/products/AGILE-FLEX-22-11-25/electricity-tariffs/E-1R-AGILE-FLEX-22-11-25-M/standard-unit-rates/",
+            "value": "https://api.octopus.energy/v1/products/AGILE-24-10-01/electricity-tariffs/E-1R-AGILE-24-10-01-A/standard-unit-rates/",
             "order": 4
         }
 }
@@ -567,6 +590,7 @@ class Manager:
             print("got json")
             json = line[6:]
             if self.config.loadJSON(json):
+                self.config.save()
                 print("*done")
                 time.sleep(2)
                 machine.reset()
@@ -583,6 +607,12 @@ class Manager:
         while True:
             self.console.update()
             time.sleep(0.01)
+            
+    def do_console_pause(self,time_secs):
+        for sec in range(0,time_secs):
+            for tick in range(0,10): 
+                self.console.update()
+                time.sleep(0.1)
 
     def do_start(self):
         wifi_ssid = self.config.get('wifiSSID')
@@ -600,9 +630,9 @@ class Manager:
             print("No Wi-FI settings - connect to USB and configure at the link above")
             self.display.do_status("Connect to USB")
             self.display.draw()
-            self.do_console_loop()
+            self.do_console_loop();
 
-        self.display.do_status("Starting")
+        self.display.do_status("Starting Version 2.0")
         self.display.draw()
         self.agile = Agile(self)
         self.connection = Connection(self)
@@ -614,8 +644,14 @@ class Manager:
             self.display.draw()
             self.do_console_loop()
         self.time_mgr.update_time()
-        self.rate = self.agile.do_get_rate(self.time_mgr)
-
+        while True:
+            self.rate = self.agile.do_get_rate(self.time_mgr)
+            if self.rate != None:
+                break
+            self.do_console_pause(10)
+            self.display.do_status("Retrying rate load")
+            self.display.draw()
+            
     def do_update(self):
         self.time_mgr.update_time()
         t = self.time_mgr.time
@@ -639,3 +675,4 @@ manager.do_start()
 while True:
     manager.do_update()
     time.sleep(1)
+
